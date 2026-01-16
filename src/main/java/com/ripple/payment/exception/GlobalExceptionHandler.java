@@ -15,6 +15,15 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbiddenException(ForbiddenException ex) {
+        log.warn("Forbidden exception: {}", ex.getMessage());
+        Map<String, Object> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        response.put("status", HttpStatus.FORBIDDEN.value());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
     @ExceptionHandler(PaymentException.class)
     public ResponseEntity<Map<String, Object>> handlePaymentException(PaymentException ex) {
         log.error("Payment exception: {}", ex.getMessage());

@@ -1,12 +1,15 @@
 package com.ripple.payment.service;
 
 import com.ripple.payment.config.FxServiceConfig;
+import com.ripple.payment.exception.ForbiddenException;
 import com.ripple.payment.exception.PaymentException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -16,20 +19,6 @@ import java.util.Map;
 
 /**
  * Client for interacting with the external FX service.
- * 
- * <p>This client implements:
- * <ul>
- *   <li><b>Circuit Breaker</b>: Prevents cascading failures when FX service is down</li>
- *   <li><b>Retry</b>: Automatically retries failed requests with exponential backoff</li>
- *   <li><b>Timeout</b>: Ensures requests don't hang indefinitely</li>
- * </ul>
- * 
- * <p>Circuit Breaker States:
- * <ul>
- *   <li><b>CLOSED</b>: Normal operation, requests pass through</li>
- *   <li><b>OPEN</b>: Service is failing, requests fail fast without calling service</li>
- *   <li><b>HALF_OPEN</b>: Testing if service has recovered, allows limited requests</li>
- * </ul>
  */
 @Service
 @RequiredArgsConstructor
@@ -93,6 +82,14 @@ public class FxServiceClient {
             log.info("Successfully retrieved FX rate: {} for {}/{}", rate, sourceCurrency, destinationCurrency);
             return rate;
 
+        } catch (HttpClientErrorException e) {
+            // Handle 403 Forbidden specifically - don't save to database
+            if (e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                log.warn("FX service returned 403 Forbidden for {}/{}", sourceCurrency, destinationCurrency);
+                throw new ForbiddenException("Access forbidden by FX service");
+            }
+            log.error("HTTP error calling FX service: {} - {}", e.getStatusCode(), e.getMessage());
+            throw new PaymentException("Error calling FX service: " + e.getMessage(), e);
         } catch (ResourceAccessException e) {
             log.error("Timeout or connection error accessing FX service: {}", e.getMessage());
             throw new PaymentException("FX service is unavailable or slow: " + e.getMessage(), e);

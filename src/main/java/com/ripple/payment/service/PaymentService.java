@@ -1,5 +1,6 @@
 package com.ripple.payment.service;
 
+import com.ripple.payment.exception.ForbiddenException;
 import com.ripple.payment.exception.PaymentException;
 import com.ripple.payment.model.*;
 import com.ripple.payment.repository.PaymentRepository;
@@ -17,17 +18,9 @@ import java.util.stream.Collectors;
 /**
  * Service for processing cross-currency payments.
  * 
- * <p>Thread-Safety: This service is thread-safe for concurrent payment processing:
- * <ul>
- *   <li>No shared mutable state - all dependencies are final and thread-safe</li>
- *   <li>Each payment is created fresh per request - no shared payment instances</li>
- *   <li>Database transactions provide isolation between concurrent operations</li>
- *   <li>Optimistic locking (@Version) prevents lost updates on concurrent modifications</li>
- *   <li>Immutable types used (BigDecimal, String, LocalDateTime, PaymentStatus enum)</li>
- *   <li>Thread-safe dependencies: RestTemplate, JpaRepository are stateless</li>
- * </ul>
+ * Thread-Safety: This service is thread-safe for concurrent payment processing
  * 
- * <p>Multiple threads can safely process different payments concurrently.
+ * Multiple threads can safely process different payments concurrently.
  * If the same payment is updated concurrently, optimistic locking will detect and handle it.
  */
 @Service
@@ -92,6 +85,10 @@ public class PaymentService {
             payment = paymentRepository.save(payment);
             log.info("Payment {} succeeded. Payout: {} {}", payment.getId(), payoutAmount, payment.getDestinationCurrency());
 
+        } catch (ForbiddenException e) {
+            // 403 Forbidden - don't save to database, transaction will rollback
+            log.warn("Payment request forbidden by FX service: {}", e.getMessage());
+            throw e; // Re-throw to be handled by GlobalExceptionHandler, transaction rolls back
         } catch (PaymentException e) {
             // Business logic failure - update payment status but don't rollback transaction
             log.error("Payment processing failed: {}", e.getMessage());
