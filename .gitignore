@@ -1,1 +1,11 @@
-./target
+target/
+.mvn/
+.idea/
+.vscode/
+.DS_Store
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+.mvn/wrapper/maven-wrapper.xml
+.mvn/wrapper/maven-wrapper.xml.asc
+.mvn/wrapper/maven-wrapper.xml.asc.asc
+.mvn/wrapper/maven-wrapper.xml.asc.asc.asc
